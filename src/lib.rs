@@ -1,0 +1,182 @@
+//! This is a platform agnostic Rust driver for the TCS3400 RGB color light to
+//! digital converter with IR filter, based on the [`embedded-hal`] traits.
+//!
+//! [`embedded-hal`]: https://github.com/rust-embedded/embedded-hal
+//!
+//! This driver allows you to:
+//! - Enable/disable the device.
+//! - Enable/disable the RGB converter.
+//! - Set RGB converter gain.
+//! - Enable/disable the RGB converter interrupt generation.
+//! - Set the RGB converter interrupt clear channel low/high thresholds.
+//! - Set the RGB converter interrupt persistence.
+//! - Set the number of integration cycles.
+//! - Enable/disable the wait feature.
+//! - Set the number of wait time cycles.
+//! - Enable/disable the *wait long* setting.
+//! - Read status of RGB converter.
+//! - Read the clear (unfiltered) channel measurement.
+//! - Read the red channel measurement.
+//! - Read the green channel measurement.
+//! - Read the blue channel measurement.
+//! - Read the measurement of all channels at once.
+//! - Read the device ID.
+//!
+//! ## The device
+//!
+//! The TCS3400 device provides a digital return of red, green, blue (RGB), and
+//! clear light sensing values. An IR blocking filter, integrated on-chip and
+//! localized to the color sensing photodiodes, minimizes the IR spectral
+//! component of the incoming light and allows color measurements to be made
+//! accurately. The high sensitivity, wide dynamic range, and IR blocking
+//! filter make the TCS3400 an ideal color sensor solution for use under
+//! varying lighting conditions and through attenuating materials.
+//!
+//! The TCS3400 color sensor has a wide range of applications including RGB LED
+//! backlight control, solid-state lighting, health/fitness products,
+//! industrial process controls and medical diagnostic equipment. In addition,
+//! the IR blocking filter enables the TCS3400 to perform ambient light sensing
+//! (ALS). Ambient light sensing is widely used in display-based products such
+//! as cell phones, notebooks, and TVs to sense the lighting environment and
+//! enable automatic display brightness for optimal viewing and power savings.
+//! The TCS3400, itself, can enter a lower-power wait state between light
+//! sensing measurements to further reduce the average power consumption.
+//!
+//! Datasheet:
+//! - [TCS3400](https://ams.com/documents/20143/36005/TCS3400_DS000411_5-00.pdf)
+//!
+//! This driver is compatible with the devices TCS34001 and TCS34003.
+//!
+//! ## Usage examples (see also examples folder)
+//!
+//! To use this driver, import this crate and an `embedded_hal` implementation,
+//! then create an instance of the driver.
+//!
+//! ### Enable and read the color measurement
+//!
+//! Import this crate and an `embedded_hal` implementation, then instantiate
+//! the device:
+//!
+//! ```no_run
+//! use linux_embedded_hal::I2cdev;
+//! use tcs3400::Tcs3400;
+//!
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! let mut sensor = Tcs3400::new(dev);
+//! sensor.enable().unwrap();
+//! sensor.enable_rgbc().unwrap();
+//! while !sensor.is_rgbc_status_valid().unwrap() {
+//!     // wait for measurement to be available
+//! };
+//!
+//! let clear = sensor.read_clear_channel().unwrap();
+//! let red = sensor.read_red_channel().unwrap();
+//! let green = sensor.read_green_channel().unwrap();
+//! let blue = sensor.read_blue_channel().unwrap();
+//!
+//! println!("Measurements: clear = {}, red = {}, green = {}, blue = {}",
+//!          clear, red, green, blue);
+//! ```
+//!
+//! ### Read all the channels at once
+//!
+//! ```no_run
+//! use linux_embedded_hal::I2cdev;
+//! use tcs3400::Tcs3400;
+//!
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! let mut sensor = Tcs3400::new(dev);
+//! sensor.enable().unwrap();
+//! sensor.enable_rgbc().unwrap();
+//! while !sensor.is_rgbc_status_valid().unwrap() {
+//!     // wait for measurement to be available
+//! };
+//!
+//! let measurement = sensor.read_all_channels().unwrap();
+//!
+//! println!("Measurements: clear = {}, red = {}, green = {}, blue = {}",
+//!          measurement.clear, measurement.red, measurement.green,
+//!          measurement.blue);
+//! ```
+//!
+//! ### Change the RGB converter gain and integration cycles
+//!
+//! ```no_run
+//! use linux_embedded_hal::I2cdev;
+//! use tcs3400::{RgbCGain, Tcs3400};
+//!
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! let mut sensor = Tcs3400::new(dev);
+//! sensor.enable().unwrap();
+//! sensor.enable_rgbc().unwrap();
+//! sensor.set_rgbc_gain(RgbCGain::_16x).unwrap();
+//! sensor.set_integration_cycles(32).unwrap();
+//! ```
+//!
+//! ### Enable wait function and set wait time to 1.008s
+//!
+//! ```no_run
+//! use linux_embedded_hal::I2cdev;
+//! use tcs3400::Tcs3400;
+//!
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! let mut sensor = Tcs3400::new(dev);
+//! sensor.enable().unwrap();
+//! sensor.enable_rgbc().unwrap();
+//! // This results in 35 * 2.4ms * 12 = 1.008s
+//! sensor.set_wait_cycles(35).unwrap();
+//! sensor.enable_wait_long().unwrap(); // 12x mutiplicator
+//! sensor.enable_wait().unwrap(); // actually enable wait timer
+//! ```
+//!
+//! ### Enable and configure RGB converter interrupt generation
+//!
+//! ```no_run
+//! use linux_embedded_hal::I2cdev;
+//! use tcs3400::{RgbCInterruptPersistence, Tcs3400};
+//!
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! let mut sensor = Tcs3400::new(dev);
+//! sensor.enable().unwrap();
+//! sensor.enable_rgbc().unwrap();
+//! sensor.set_rgbc_interrupt_low_threshold(1024).unwrap();
+//! sensor.set_rgbc_interrupt_high_threshold(61440).unwrap();
+//! sensor.set_rgbc_interrupt_persistence(RgbCInterruptPersistence::_5).unwrap();
+//! sensor.enable_rgbc_interrupts().unwrap();
+//! ```
+
+#![deny(unsafe_code, missing_docs)]
+#![no_std]
+
+use embedded_hal::blocking::i2c;
+
+mod configuration;
+mod interface;
+use crate::interface::{BitFlags, Register, DEVICE_ADDRESS};
+mod reading;
+mod types;
+pub use crate::types::{AllChannelMeasurement, Error, RgbCGain, RgbCInterruptPersistence};
+
+/// TCS3400 device driver.
+#[derive(Debug)]
+pub struct Tcs3400<I2C> {
+    /// The concrete I²C device implementation.
+    i2c: I2C,
+    /// Enable register status
+    enable: u8,
+}
+
+impl<I2C, E> Tcs3400<I2C>
+where
+    I2C: i2c::Write<Error = E>,
+{
+    /// Create new instance of the TCS3400 device.
+    pub fn new(i2c: I2C) -> Self {
+        Tcs3400 { i2c, enable: 0 }
+    }
+
+    /// Destroy driver instance, return I²C bus instance.
+    pub fn destroy(self) -> I2C {
+        self.i2c
+    }
+}

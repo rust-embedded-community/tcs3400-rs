@@ -1,0 +1,31 @@
+[package]
+name = "tcs3400"
+version = "0.1.0"
+authors = ["Diego Barrios Romero <eldruin@gmail.com>", "Andres Vahter <andres@vahter.me>"]
+repository = "https://github.com/andresv/tcs3400-rs"
+license = "MIT OR Apache-2.0"
+description = "Platform-agnostic Rust driver for the TCS3400 RGB color light to digital converter with IR filter."
+readme = "README.md"
+keywords = ["color", "sensor", "i2c", "driver", "embedded-hal-driver"]
+categories = ["embedded", "hardware-support", "no-std"]
+homepage = "https://github.com/andresv/tcs3400-rs"
+documentation = "https://docs.rs/tcs3400"
+edition = "2018"
+include = [
+    "/**/*.rs",
+    "/Cargo.toml",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE-MIT",
+    "/LICENSE-APACHE",
+]
+
+[dependencies]
+embedded-hal = "0.2"
+
+[dev-dependencies]
+linux-embedded-hal = "0.3"
+embedded-hal-mock = "0.7"
+
+[profile.release]
+lto = true
