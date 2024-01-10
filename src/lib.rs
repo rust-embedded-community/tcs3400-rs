@@ -148,7 +148,10 @@
 #![deny(unsafe_code, missing_docs)]
 #![no_std]
 
-use embedded_hal::blocking::i2c;
+#[cfg(not(feature = "async"))]
+use embedded_hal::i2c::I2c;
+#[cfg(feature = "async")]
+use embedded_hal_async::i2c::I2c;
 
 mod configuration;
 mod interface;
@@ -168,7 +171,7 @@ pub struct Tcs3400<I2C> {
 
 impl<I2C, E> Tcs3400<I2C>
 where
-    I2C: i2c::Write<Error = E>,
+    I2C: I2c<Error = E>,
 {
     /// Create new instance of the TCS3400 device.
     pub fn new(i2c: I2C) -> Self {
